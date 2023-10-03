@@ -1,27 +1,40 @@
-import { useNavigate } from "react-router-dom";
-import { usePagination } from "../hooks/usePagination";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 import { useFilter } from "../hooks/useFilter";
+import { usePagination } from "../hooks/usePagination";
+
 import { users } from "../data/users";
+
 import Pagination from "./Pagination";
+import Select from "./Select";
+import Search from "./Search";
+import Users from "./Users";
+import useSort from "../hooks/useSort";
+import Sort from "./Sort";
 
 export default function Test4() {
   const navigate = useNavigate();
 
   const { city, age, name } = useFilter({ city: "all", age: "all", name: "" });
   const { page, size } = usePagination(1, 2);
+  const { sortField, sortOrder } = useSort("name", "asc");
 
   const [filters, setFilters] = useState({ city, name, age });
   const [currentPage, setCurrentPage] = useState(page);
+  const [currentSort, setCurrentSort] = useState({
+    sortField: "name",
+    sortOrder: "asc",
+  });
 
   useEffect(() => {
     navigate({
-      search: `?city=${filters.city}&age=${filters.age}&name=${filters.name}&page=${currentPage}&size=${size}`,
+      search: `?city=${filters.city}&age=${filters.age}&name=${filters.name}&page=${currentPage}&size=${size}&sortField=${currentSort.sortField}&sortOrder=${currentSort.sortOrder}`,
     });
-  }, [filters, currentPage, size, navigate]);
+  }, [filters, sortField, sortOrder, currentPage, currentSort, size, navigate]);
 
   // ** filtering logic to be moved into backend, only here for understanding
-  const filteredUsers = users.filter((user) => {
+  let filteredUsers = users.filter((user) => {
     return (
       (filters.city === "all" ||
         user.city.toLowerCase() === filters.city.toLowerCase()) &&
@@ -31,8 +44,19 @@ export default function Test4() {
     );
   });
 
+  // ** sorting logic to be moved into backend, only here for understanding
+  const sortedUsers = filteredUsers.sort((a, b) => {
+    return currentSort.sortOrder === "asc"
+      ? a[currentSort.sortField] > b[currentSort.sortField]
+        ? 1
+        : -1
+      : a[currentSort.sortField] < b[currentSort.sortField]
+      ? 1
+      : -1;
+  });
+
   // ** pagination logic to be moved into backend, only here for understanding
-  const paginatedUsers = filteredUsers.slice(
+  const paginatedUsers = sortedUsers.slice(
     (currentPage - 1) * size,
     currentPage * size
   );
@@ -46,49 +70,22 @@ export default function Test4() {
     setCurrentPage(newPage);
   };
 
+  const handleSortChange = (field, order) => {
+    setCurrentSort({ sortField: field, sortOrder: order });
+  };
+
   const totalPages = Math.ceil(filteredUsers.length / size);
 
   return (
     <>
-      <label>
-        Filter by city:
-        <select
-          value={filters.city}
-          onChange={(e) => handleFilterChange("city", e.target.value)}
-        >
-          <option value="all">All</option>
-          <option value="new york">New York</option>
-          <option value="detroit">Detroit</option>
-          <option value="metropolis">Metropolis</option>
-        </select>
-      </label>
-      <label>
-        Filter by age:
-        <select
-          value={filters.age}
-          onChange={(e) => handleFilterChange("age", e.target.value)}
-        >
-          <option value="all">All</option>
-          <option value="21">21</option>
-          <option value="106">106</option>
-          <option value="47">47</option>
-        </select>
-      </label>
-      <label>
-        Search by name:
-        <input
-          type="text"
-          value={filters.name}
-          onChange={(e) => handleFilterChange("name", e.target.value)}
-        />
-      </label>
-      <ul>
-        {paginatedUsers.map((user) => (
-          <li key={user.id}>
-            {user.name} - {user.age} - {user.city}
-          </li>
-        ))}
-      </ul>
+      <Sort
+        sortField={sortField}
+        sortOrder={sortOrder}
+        onSortChange={handleSortChange}
+      />
+      <Select filters={filters} onFilterChange={handleFilterChange} />
+      <Search filters={filters} onFilterChange={handleFilterChange} />
+      <Users paginatedUsers={paginatedUsers} />
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
